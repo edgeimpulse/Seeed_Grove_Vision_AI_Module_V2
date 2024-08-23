@@ -39,3 +39,5 @@ we2_image_gen_local/Images*.txt
 *.img
 
 .vscode/
+create-arduino-library.sh
+
