@@ -1,6 +1,6 @@
 override SCENARIO_APP_SUPPORT_LIST := $(APP_TYPE)
 
-APPL_DEFINES += -DTFLM_YOLOV8_POSE
+APPL_DEFINES += -DTFLM_PEOPLENET
 APPL_DEFINES += -DTF_LITE_STATIC_MEMORY
 APPL_DEFINES += -Daudvidpre_ret_pll400_timer1 -DIP_xdma
 APPL_DEFINES += -DEVT_DATAPATH
@@ -19,6 +19,12 @@ EVENTHANDLER_SUPPORT_LIST += evt_datapath
 ##
 LIB_SEL = pwrmgmt sensordp tflmtag2209_u55tag2205 spi_ptl spi_eeprom hxevent img_proc
 
+##
+# middleware support feature
+# Add new middleware here
+# The source code should be loacted in ~\middleware\{mid_name}\
+##
+MID_SEL =
 
 override OS_SEL:=
 override TRUSTZONE := y
@@ -41,10 +47,11 @@ APPL_DEFINES += -DCIS_IMX
 endif
 
 ifeq ($(strip $(TOOLCHAIN)), arm)
-override LINKER_SCRIPT_FILE := $(SCENARIO_APP_ROOT)/$(APP_TYPE)/TFLM_yolov8_pose_S_only.sct
+override LINKER_SCRIPT_FILE := $(SCENARIO_APP_ROOT)/$(APP_TYPE)/TFLM_peoplenet_S_only.sct
 else#TOOLChain
-override LINKER_SCRIPT_FILE := $(SCENARIO_APP_ROOT)/$(APP_TYPE)/TFLM_yolov8_pose_S_only.ld
+override LINKER_SCRIPT_FILE := $(SCENARIO_APP_ROOT)/$(APP_TYPE)/TFLM_peoplenet_S_only.ld
 endif
+
 ##
 # Add new external device here
 # The source code should be located in ~\external\{device_name}\

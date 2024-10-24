@@ -25,6 +25,7 @@ Finally, teach you how to restore to the original factory settings and run [Sens
 | pdm mic record | [pdm_record](https://github.com/HimaxWiseEyePlus/Seeed_Grove_Vision_AI_Module_V2/blob/main/EPII_CM55M_APP_S/app/scenario_app/pdm_record/README.md)      |
 | KeyWord Spotting using Transformers | [kws_pdm_record](https://github.com/HimaxWiseEyePlus/Seeed_Grove_Vision_AI_Module_V2/blob/main/EPII_CM55M_APP_S/app/scenario_app/kws_pdm_record/README.md) |
 | imu read | [imu_read](https://github.com/HimaxWiseEyePlus/Seeed_Grove_Vision_AI_Module_V2/blob/main/EPII_CM55M_APP_S/app/scenario_app/imu_read/README.md) |
+| peoplenet from TAO | [tflm_peoplenet](https://github.com/HimaxWiseEyePlus/Seeed_Grove_Vision_AI_Module_V2/blob/main/EPII_CM55M_APP_S/app/scenario_app/tflm_peoplenet/README.md) |
 
 - [How to add support for raspberry pi camera?](https://github.com/HimaxWiseEyePlus/Seeed_Grove_Vision_AI_Module_V2?tab=readme-ov-file#how-to-add-support-for-raspberry-pi-camera)
 - [How to use CMSIS-NN at the project?](https://github.com/HimaxWiseEyePlus/Seeed_Grove_Vision_AI_Module_V2?tab=readme-ov-file#how-to-use-cmsis-nn-at-the-project)
@@ -88,7 +89,25 @@ Note: The following has been tested to work on Ubuntu 20.04 PC
 
 [Back to Outline](https://github.com/HimaxWiseEyePlus/Seeed_Grove_Vision_AI_Module_V2?tab=readme-ov-file#outline)
 ### Build the firmware at MacOS environment
-Note: The steps are almost the same as the [Linux environment](https://github.com/HimaxWiseEyePlus/Seeed_Grove_Vision_AI_Module_V2?tab=readme-ov-file#build-the-firmware-at-linux-environment) except `Step 7`.
+Note: The steps are almost the same as the [Linux environment](https://github.com/HimaxWiseEyePlus/Seeed_Grove_Vision_AI_Module_V2?tab=readme-ov-file#build-the-firmware-at-linux-environment) except `Step 1` and `Step 7`.
+- Step 1: 
+    - You should make sure your `make` is using `GNU version make` not `BSD version make`.
+        ```
+        make --version
+        ```
+        ![alt text](images/mac_gnu_make.png)
+    - If it is not `GNU make` , you should download it by following command.
+        ```
+        brew install make
+        ```
+    - After installation, you can access it with the command gmake to avoid conflicts with the default make.
+        ```
+        gmake
+        ```
+    - So, you should create an alias in your shell configuration file (like .bash_profile or .zshrc):
+        ```
+        alias make='gmake'
+        ```
 - Step 7: Generate firmware image file (using `./we2_local_image_gen_macOS_arm64` for MacOS)
     ```
     cd ../we2_image_gen_local/
@@ -98,7 +117,7 @@ Note: The steps are almost the same as the [Linux environment](https://github.co
 [Back to Outline](https://github.com/HimaxWiseEyePlus/Seeed_Grove_Vision_AI_Module_V2?tab=readme-ov-file#outline)
 
 ### Build the firmware at Windows environment
-- Step 1: Install the `make` command for prerequisites
+- Step 1: Install the `make` command for prerequisites , you can reference [here](https://github.com/xpack-dev-tools/windows-build-tools-xpack/releases)
 - Step 2: Download Arm GNU Toolchain [arm-gnu-toolchain-13.2.rel1-mingw-w64-i686-arm-none-eabi.zip](https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-mingw-w64-i686-arm-none-eabi.zip?rev=93fda279901c4c0299e03e5c4899b51f&hash=A3C5FF788BE90810E121091C873E3532336C8D46)
 - Step 3: Extract the file
     ```
