@@ -9,6 +9,7 @@ APPL_DEFINES += -DETHOSU55
 APPL_DEFINES += -DETHOS_U
 APPL_DEFINES += -DIP_xdma
 APPL_DEFINES += -DEVT_DATAPATH
+APPL_DEFINES += -DEI_MODEL_SECTION=".model"
 
 EVENTHANDLER_SUPPORT = event_handler
 EVENTHANDLER_SUPPORT_LIST += evt_datapath
@@ -18,7 +19,7 @@ EVENTHANDLER_SUPPORT_LIST += evt_datapath
 # Add new library here
 # The source code should be loacted in ~\library\{lib_name}\
 ##
-LIB_SEL = pwrmgmt sensordp hxevent img_proc
+LIB_SEL = pwrmgmt sensordp hxevent img_proc spi_eeprom
 
 ##
 # middleware support feature
@@ -27,6 +28,8 @@ LIB_SEL = pwrmgmt sensordp hxevent img_proc
 ##
 MID_SEL =
 
+# disable built-in CMSIS NN library. Edge Impulse SDK is providing its own NN library
+override LIB_CMSIS_NN_ENALBE := 0
 override undefine OS_SEL
 override TRUSTZONE := y
 override TRUSTZONE_TYPE := security
@@ -69,11 +72,25 @@ SCENARIO_APP_SUPPORT_LIST +=	ei_standalone_inferencing_camera/ei-model/tflite-mo
 								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/CMSIS/DSP/Source/StatisticsFunctions \
 								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/CMSIS/DSP/Source/SupportFunctions \
 								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/CMSIS/DSP/Source/TransformFunctions \
+								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/CMSIS/NN \
+								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/CMSIS/NN/Include \
+								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/CMSIS/NN/Source \
+								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/CMSIS/NN/Source/PoolingFunctions \
+								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/CMSIS/NN/Source/NNSupportFunctions \
+								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/CMSIS/NN/Source/FullyConnectedFunctions \
+								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/CMSIS/NN/Source/ConcatenationFunctions \
+								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/CMSIS/NN/Source/SoftmaxFunctions \
+								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/CMSIS/NN/Source/SVDFunctions \
+								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/CMSIS/NN/Source/ActivationFunctions \
+								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/CMSIS/NN/Source/BasicMathFunctions \
+								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/CMSIS/NN/Source/ConvolutionFunctions \
+								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/CMSIS/NN/Source/ReshapeFunctions \
 								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/porting \
 								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/porting/himax-we2 \
-								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/dsp/kissfft \
+								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/dsp \
 								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/dsp/dct \
 								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/dsp/image \
+								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/dsp/kissfft \
 								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/tensorflow/lite/ \
 								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/tensorflow/lite/c \
 								ei_standalone_inferencing_camera/ei-model/edge-impulse-sdk/tensorflow/lite/core/api \

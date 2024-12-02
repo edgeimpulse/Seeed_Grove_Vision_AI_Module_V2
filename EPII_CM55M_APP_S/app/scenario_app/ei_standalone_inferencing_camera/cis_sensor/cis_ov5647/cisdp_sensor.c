@@ -13,8 +13,13 @@
 #include "hx_drv_CIS_common.h"
 
 #include "WE2_core.h"
-#include "hx_drv_scu.h"
+#include "WE2_debug.h"
+#include "hx_drv_swreg_aon.h"
 #include "hx_drv_scu_export.h"
+#include "driver_interface.h"
+#include "hx_drv_scu.h"
+#include "math.h"
+#include <stdlib.h>
 
 #define GROVE_VISION_AI
 
@@ -40,24 +45,12 @@
 #endif
 #endif
 
-//#define CDM_TOTAL_SIZE  100
-//__attribute__(( section(".bss.NoInit"))) uint8_t cdmbuf[CDM_TOTAL_SIZE] __ALIGNED(32);
+static volatile uint32_t g_wdma1_baseaddr = SENDPLIB_WDMA1_ADDR;
+static volatile uint32_t g_wdma2_baseaddr = SENDPLIB_WDMA2_ADDR;
+static volatile uint32_t g_wdma3_baseaddr = SENDPLIB_WDMA3_ADDR;
+static volatile uint32_t g_jpegautofill_addr = SENDPLIB_JPEG_YUV400_AUTOFILL_ADDR;
 
-#define JPEG_BUFSIZE  (((623+ (OV5647_HW5x5_CROP_WIDTH/16)*(OV5647_HW5x5_CROP_HEIGHT/16)* 38 + 35) >>2 ) <<2)	//YUV420 x10 Compress = ((623+ (W/16)*(H/16)* 38 + 35) >>2 ) <<2  byte
-__attribute__(( section(".bss.NoInit"))) uint8_t jpegbuf[JPEG_BUFSIZE] __ALIGNED(32);
-
-#define RAW_BUFSIZE  (OV5647_HW5x5_CROP_WIDTH*OV5647_HW5x5_CROP_HEIGHT*3)	//YUV420: Y= W*H byte, U = ((W*H)>>2) byte, V = ((W*H)>>2) byte
-__attribute__(( section(".bss.NoInit"))) uint8_t demosbuf[RAW_BUFSIZE] __ALIGNED(32);
-
-#define JPEG_HEADER_BUFSIZE 100
-__attribute__(( section(".bss.NoInit"))) uint8_t jpegfilesizebuf[JPEG_HEADER_BUFSIZE] __ALIGNED(32);
-
-static volatile uint32_t g_wdma1_baseaddr = (uint32_t)jpegbuf; // = (uint32_t)cdmbuf; // - no use
-static volatile uint32_t g_wdma2_baseaddr = (uint32_t)jpegbuf;
-static volatile uint32_t g_wdma3_baseaddr = (uint32_t)demosbuf;
-static volatile uint32_t g_jpegautofill_addr = (uint32_t)jpegfilesizebuf;
-
-static APP_DP_INP_SUBSAMPLE_E g_subs = APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X;
+static APP_DP_INP_SUBSAMPLE_E g_subs = APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X;
 
 #ifdef OV5647_SUPPORT_BINNING
 static volatile INP_SUBSAMPLE_E g_subsample = INP_SUBSAMPLE_DISABLE;
@@ -84,6 +77,61 @@ static HX_CIS_SensorSetting_t OV5647_stream_off[] = {
 
 static void cisdp_wdma_addr_init(APP_DP_INP_SUBSAMPLE_E subs)
 {
+#ifdef DYNAMIC_ADDRESS
+	xprintf("Allocating for subs %d\n", subs);
+	if(subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X) {
+		g_jpegautofill_addr = (uint32_t)aligned_alloc(0x20,128);
+		g_wdma1_baseaddr = (uint32_t)malloc(76800); //640*480/4
+		g_wdma3_baseaddr = (uint32_t)malloc(921600); //640*480*3
+	}
+	else if(subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X) {
+		g_jpegautofill_addr = (uint32_t)aligned_alloc(0x20,128);
+		g_wdma1_baseaddr = (uint32_t)malloc(19200); //320*240/4
+		g_wdma3_baseaddr = (uint32_t)malloc(230400); //320*240*3
+	}
+	else if(subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X) {
+		g_jpegautofill_addr = (uint32_t)aligned_alloc(0x20,128);
+		g_wdma1_baseaddr = (uint32_t)malloc(76800); //640*480/4
+		g_wdma3_baseaddr = (uint32_t)malloc(460800); //640*480*1.5
+	}
+	else if(subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_2X) {
+		g_jpegautofill_addr = (uint32_t)aligned_alloc(0x20,128);
+		g_wdma1_baseaddr = (uint32_t)malloc(19200); //320*240/4
+		g_wdma3_baseaddr = (uint32_t)malloc(115200); //320*240*1.5
+	}
+
+	if(g_jpegautofill_addr == 0) {
+		xprintf("ERROR! JPEG autofill buffer allocation failed!\n");
+		return;
+	}
+
+	if(g_wdma1_baseaddr == 0) {
+		xprintf("ERROR! WDMA1 buffer allocation failed!\n");
+		free((void*)g_jpegautofill_addr);
+		return;
+	}
+	else {
+		g_wdma2_baseaddr = g_wdma1_baseaddr;
+	}
+
+	if (g_wdma3_baseaddr == 0) {
+		xprintf("ERROR! WDMA3 buffer allocation failed!\n");
+		free((void*)g_jpegautofill_addr);
+		free((void*)g_wdma1_baseaddr);
+		return;
+	}
+
+#else
+    g_wdma1_baseaddr = SENDPLIB_WDMA1_ADDR;
+    g_wdma2_baseaddr = SENDPLIB_WDMA2_ADDR;
+    g_wdma3_baseaddr = SENDPLIB_WDMA3_ADDR;
+
+    if ( subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X||subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X||subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_4X )
+    	g_jpegautofill_addr = SENDPLIB_JPEG_RGB_AUTOFILL_ADDR;
+    else
+    	g_jpegautofill_addr = SENDPLIB_JPEG_YUV420_AUTOFILL_ADDR;
+#endif
+
     sensordplib_set_xDMA_baseaddrbyapp(g_wdma1_baseaddr, g_wdma2_baseaddr, g_wdma3_baseaddr);
     sensordplib_set_jpegfilesize_addrbyapp(g_jpegautofill_addr);
 
@@ -427,7 +475,45 @@ int cisdp_dp_init(bool inp_init, SENSORDPLIB_PATH_E dp_type, evthandlerdp_CBEven
     else
     	crop.last_y = 0;
 
-	sensordplib_set_sensorctrl_inp_wi_crop(SENCTRL_SENSOR_TYPE, SENCTRL_STREAM_TYPE, SENCTRL_SENSOR_WIDTH, SENCTRL_SENSOR_HEIGHT, g_subsample, crop);
+	if(inp_init == true) {
+		#if 1
+			#ifdef OV5647_SUPPORT_BINNING
+				/**bin from 640x480 sensor**/
+				if(subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X||subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_2X)
+				sensordplib_set_sensorctrl_inp_wi_crop_bin(SENCTRL_SENSOR_TYPE, SENCTRL_STREAM_TYPE, SENCTRL_SENSOR_WIDTH,
+							SENCTRL_SENSOR_HEIGHT, INP_SUBSAMPLE_DISABLE, crop ,INP_BINNING_4TO2_B);
+				else if(subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X||subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X)
+				sensordplib_set_sensorctrl_inp_wi_crop_bin(SENCTRL_SENSOR_TYPE, SENCTRL_STREAM_TYPE, SENCTRL_SENSOR_WIDTH,
+								SENCTRL_SENSOR_HEIGHT, INP_SUBSAMPLE_DISABLE, crop ,INP_BINNING_DISABLE);
+			#else
+				/**bin from 5M sensor**/
+				if(subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X||subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_2X)
+				sensordplib_set_sensorctrl_inp_wi_crop_bin(SENCTRL_SENSOR_TYPE, SENCTRL_STREAM_TYPE, SENCTRL_SENSOR_WIDTH,
+							SENCTRL_SENSOR_HEIGHT, INP_SUBSAMPLE_DISABLE, crop ,INP_BINNING_16TO2_B);
+				else if(subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X||subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X)
+				sensordplib_set_sensorctrl_inp_wi_crop_bin(SENCTRL_SENSOR_TYPE, SENCTRL_STREAM_TYPE, SENCTRL_SENSOR_WIDTH,
+								SENCTRL_SENSOR_HEIGHT, INP_SUBSAMPLE_DISABLE, crop ,INP_BINNING_8TO2_B);
+
+				/**subsample from 5M sensor**/
+				/*
+				if(subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X||subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_2X)
+				sensordplib_set_sensorctrl_inp_wi_crop_bin(SENCTRL_SENSOR_TYPE, SENCTRL_STREAM_TYPE, SENCTRL_SENSOR_WIDTH,
+							SENCTRL_SENSOR_HEIGHT, INP_SUBSAMPLE_16TO2_B, crop ,INP_BINNING_DISABLE);
+				else if(subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X||subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X)
+				sensordplib_set_sensorctrl_inp_wi_crop_bin(SENCTRL_SENSOR_TYPE, SENCTRL_STREAM_TYPE, SENCTRL_SENSOR_WIDTH,
+								SENCTRL_SENSOR_HEIGHT, INP_SUBSAMPLE_8TO2_B, crop ,INP_BINNING_DISABLE);
+				*/
+			#endif
+		#else
+			/**subsample from 640x480 sensor**/
+			if(subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X||subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_2X)
+				sensordplib_set_sensorctrl_inp(SENCTRL_SENSOR_TYPE, SENCTRL_STREAM_TYPE, SENCTRL_SENSOR_WIDTH,
+							SENCTRL_SENSOR_HEIGHT, INP_SUBSAMPLE_4TO2);
+			else if(subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X||subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X)
+				sensordplib_set_sensorctrl_inp(SENCTRL_SENSOR_TYPE, SENCTRL_STREAM_TYPE, SENCTRL_SENSOR_WIDTH,
+							SENCTRL_SENSOR_HEIGHT, INP_SUBSAMPLE_DISABLE);
+		#endif
+	}
 
 	uint8_t cyclic_buffer_cnt = 1;
 
@@ -603,6 +689,13 @@ uint32_t app_get_jpeg_addr()
 	return g_wdma2_baseaddr;
 }
 
+uint32_t app_get_jpeg_sz()
+{
+    //EPII_InvalidateDCache_by_Addr(g_jpegautofill_addr, 4);
+    hx_InvalidateDCache_by_Addr((volatile void *)g_jpegautofill_addr, 32);
+	return *((uint32_t*)g_jpegautofill_addr);
+}
+
 uint32_t app_get_raw_addr()
 {
 	//raw data area BBBBBB/GGGGGG/RRRRRR
@@ -653,3 +746,4 @@ uint32_t app_get_raw_height() {
 uint32_t app_get_raw_channels() {
 	return SENCTRL_SENSOR_CH;
 }
+

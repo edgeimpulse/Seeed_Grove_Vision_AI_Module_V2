@@ -13,8 +13,13 @@
 #include "hx_drv_CIS_common.h"
 
 #include "WE2_core.h"
-#include "hx_drv_scu.h"
+#include "WE2_debug.h"
+#include "hx_drv_swreg_aon.h"
 #include "hx_drv_scu_export.h"
+#include "driver_interface.h"
+#include "hx_drv_scu.h"
+#include "math.h"
+#include "memory_manage.h"
 
 #define GROVE_VISION_AI
 
@@ -40,19 +45,13 @@
 #endif
 #endif
 
-#define JPEG_BUFSIZE  (((623+ (IMX219_HW5x5_CROP_WIDTH/16)*(IMX219_HW5x5_CROP_HEIGHT/16)* 38 + 35) >>2 ) <<2)	//YUV420 x10 Compress = ((623+ (W/16)*(H/16)* 38 + 35) >>2 ) <<2  byte
-__attribute__(( section(".bss.NoInit"))) uint8_t jpegbuf[JPEG_BUFSIZE] __ALIGNED(32);
+static volatile uint32_t g_wdma1_baseaddr = SENDPLIB_WDMA1_ADDR;
+static volatile uint32_t g_wdma2_baseaddr = SENDPLIB_WDMA2_ADDR;
+static volatile uint32_t g_wdma3_baseaddr = SENDPLIB_WDMA3_ADDR;
+static volatile uint32_t g_jpegautofill_addr = SENDPLIB_JPEG_YUV400_AUTOFILL_ADDR;
 
-#define RAW_BUFSIZE  (IMX219_HW5x5_CROP_WIDTH*IMX219_HW5x5_CROP_HEIGHT*3/2)   //YUV420: Y= W*H byte, U = ((W*H)>>2) byte, V = ((W*H)>>2) byte
-__attribute__(( section(".bss.NoInit"))) uint8_t demosbuf[RAW_BUFSIZE] __ALIGNED(32);
-
-#define JPEG_HEADER_BUFSIZE 100
-__attribute__(( section(".bss.NoInit"))) uint8_t jpegfilesizebuf[JPEG_HEADER_BUFSIZE] __ALIGNED(32);
-
-static volatile uint32_t g_wdma1_baseaddr = (uint32_t)jpegbuf; // = (uint32_t)cdmbuf; // - no use
-static volatile uint32_t g_wdma2_baseaddr = (uint32_t)jpegbuf;
-static volatile uint32_t g_wdma3_baseaddr = (uint32_t)demosbuf;
-static volatile uint32_t g_jpegautofill_addr = (uint32_t)jpegfilesizebuf;
+static APP_DP_INP_SUBSAMPLE_E g_subs = APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X;
+static INP_SUBSAMPLE_E g_subsample = INP_SUBSAMPLE_DISABLE;
 
 static HX_CIS_SensorSetting_t IMX219_init_setting[] = {
 #include "IMX219_mipi_2lane_3280x2464.i"
@@ -89,12 +88,65 @@ static HX_CIS_SensorSetting_t  IMX219_mirror_setting[] = {
 		{HX_CIS_I2C_Action_W, 0x0172, (CIS_MIRROR_SETTING&0xFF)},
 };
 
+
 static void cisdp_wdma_addr_init(APP_DP_INP_SUBSAMPLE_E subs)
 {
+#ifdef DYNAMIC_ADDRESS
+	if(subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X) {
+		g_jpegautofill_addr = mm_reserve_align(100,0x20);
+		g_wdma1_baseaddr = mm_reserve(76800); //640*480/4
+		if(g_wdma1_baseaddr!=0)
+			g_wdma2_baseaddr = g_wdma1_baseaddr;
+		else
+			return ;
+
+		g_wdma3_baseaddr= mm_reserve(921600); //640*480*3
+	}
+	else if(subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X) {
+		g_jpegautofill_addr = mm_reserve_align(100,0x20);
+		g_wdma1_baseaddr = mm_reserve(19200); //320*240/4
+		if(g_wdma1_baseaddr!=0)
+			g_wdma2_baseaddr = g_wdma1_baseaddr;
+		else
+			return ;
+
+		g_wdma3_baseaddr= mm_reserve(230400); //320*240*3
+	}
+	else if(subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X) {
+		g_jpegautofill_addr = mm_reserve_align(100,0x20);
+		g_wdma1_baseaddr = mm_reserve(76800); //640*480/4
+		if(g_wdma1_baseaddr!=0)
+			g_wdma2_baseaddr = g_wdma1_baseaddr;
+		else
+			return ;
+
+		g_wdma3_baseaddr= mm_reserve(460800); //640*480*1.5
+	}
+	else if(subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_2X) {
+		g_jpegautofill_addr = mm_reserve_align(100,0x20);
+		g_wdma1_baseaddr = mm_reserve(19200); //320*240/4
+		if(g_wdma1_baseaddr!=0)
+			g_wdma2_baseaddr = g_wdma1_baseaddr;
+		else
+			return ;
+
+		g_wdma3_baseaddr= mm_reserve(115200); //320*240*1.5
+	}
+#else
+    g_wdma1_baseaddr = SENDPLIB_WDMA1_ADDR;
+    g_wdma2_baseaddr = SENDPLIB_WDMA2_ADDR;
+    g_wdma3_baseaddr = SENDPLIB_WDMA3_ADDR;
+
+    if ( subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X||subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X||subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_4X )
+    	g_jpegautofill_addr = SENDPLIB_JPEG_RGB_AUTOFILL_ADDR;
+    else
+    	g_jpegautofill_addr = SENDPLIB_JPEG_YUV420_AUTOFILL_ADDR;
+#endif
+
     sensordplib_set_xDMA_baseaddrbyapp(g_wdma1_baseaddr, g_wdma2_baseaddr, g_wdma3_baseaddr);
     sensordplib_set_jpegfilesize_addrbyapp(g_jpegautofill_addr);
 
-	xprintf("WD1[%x], WD2_J[%x], WD3_RAW[%x], JPAuto[%x]\n",g_wdma1_baseaddr, g_wdma2_baseaddr,
+	xprintf("WD1[%x], WD2_J[%x], WD3_RAW[%x], JPAuto[%x]\n",g_wdma1_baseaddr,g_wdma2_baseaddr,
 			g_wdma3_baseaddr, g_jpegautofill_addr);
 }
 
@@ -292,6 +344,7 @@ int cisdp_sensor_init()
     hx_drv_sensorctrl_set_xSleepCtrl(SENSORCTRL_XSLEEP_BY_CPU);
     hx_drv_sensorctrl_set_xSleep(1);
     dbg_printf(DBG_LESS_INFO, "hx_drv_sensorctrl_set_xSleep(1)\n");
+    hx_drv_timer_cm55x_delay_ms(100, TIMER_STATE_DC);
 #endif
 
     hx_drv_cis_set_slaveID(CIS_I2C_ID);
@@ -315,60 +368,60 @@ int cisdp_sensor_init()
 		dbg_printf(DBG_LESS_INFO, "IMX219 Init Stream by app \n");
 	}
 
-    //imx219_set_binning
-    if(hx_drv_cis_setRegTable(IMX219_binning_setting, HX_CIS_SIZE_N(IMX219_binning_setting, HX_CIS_SensorSetting_t))!= HX_CIS_NO_ERROR)
-    {
-        dbg_printf(DBG_LESS_INFO, "IMX219 Init by app fail (IMX219_binning_setting)\n");
+	//imx219_set_binning
+	if(hx_drv_cis_setRegTable(IMX219_binning_setting, HX_CIS_SIZE_N(IMX219_binning_setting, HX_CIS_SensorSetting_t))!= HX_CIS_NO_ERROR)
+	{
+		dbg_printf(DBG_LESS_INFO, "IMX219 Init by app fail (IMX219_binning_setting)\n");
 		return -1;
-    }
-    else
-    {
-    	dbg_printf(DBG_LESS_INFO, "IMX219 Init by app (IMX219_binning_setting)\n");
-    }
+	}
+	else
+	{
+		dbg_printf(DBG_LESS_INFO, "IMX219 Init by app (IMX219_binning_setting)\n");
+	}
 
-    //imx219_set_exposure
-    if(hx_drv_cis_setRegTable(IMX219_exposure_setting, HX_CIS_SIZE_N(IMX219_exposure_setting, HX_CIS_SensorSetting_t))!= HX_CIS_NO_ERROR)
-    {
-        dbg_printf(DBG_LESS_INFO, "IMX219 Init by app fail (IMX219_exposure_setting)\n");
+	//imx219_set_exposure
+	if(hx_drv_cis_setRegTable(IMX219_exposure_setting, HX_CIS_SIZE_N(IMX219_exposure_setting, HX_CIS_SensorSetting_t))!= HX_CIS_NO_ERROR)
+	{
+		dbg_printf(DBG_LESS_INFO, "IMX219 Init by app fail (IMX219_exposure_setting)\n");
 		return -1;
-    }
-    else
-    {
-    	dbg_printf(DBG_LESS_INFO, "IMX219 Init by app (IMX219_exposure_setting)\n");
-    }
+	}
+	else
+	{
+		dbg_printf(DBG_LESS_INFO, "IMX219 Init by app (IMX219_exposure_setting)\n");
+	}
 
-    //imx219_set_again
-    if(hx_drv_cis_setRegTable(IMX219_again_setting, HX_CIS_SIZE_N(IMX219_again_setting, HX_CIS_SensorSetting_t))!= HX_CIS_NO_ERROR)
-    {
-        dbg_printf(DBG_LESS_INFO, "IMX219 Init by app fail (IMX219_again_setting)\n");
+	//imx219_set_again
+	if(hx_drv_cis_setRegTable(IMX219_again_setting, HX_CIS_SIZE_N(IMX219_again_setting, HX_CIS_SensorSetting_t))!= HX_CIS_NO_ERROR)
+	{
+		dbg_printf(DBG_LESS_INFO, "IMX219 Init by app fail (IMX219_again_setting)\n");
 		return -1;
-    }
-    else
-    {
-    	dbg_printf(DBG_LESS_INFO, "IMX219 Init by app (IMX219_again_setting)\n");
-    }
+	}
+	else
+	{
+		dbg_printf(DBG_LESS_INFO, "IMX219 Init by app (IMX219_again_setting)\n");
+	}
 
-    //imx219_set_dgain
-    if(hx_drv_cis_setRegTable(IMX219_dgain_setting, HX_CIS_SIZE_N(IMX219_dgain_setting, HX_CIS_SensorSetting_t))!= HX_CIS_NO_ERROR)
-    {
-        dbg_printf(DBG_LESS_INFO, "IMX219 Init by app fail (IMX219_dgain_setting)\n");
+	//imx219_set_dgain
+	if(hx_drv_cis_setRegTable(IMX219_dgain_setting, HX_CIS_SIZE_N(IMX219_dgain_setting, HX_CIS_SensorSetting_t))!= HX_CIS_NO_ERROR)
+	{
+		dbg_printf(DBG_LESS_INFO, "IMX219 Init by app fail (IMX219_dgain_setting)\n");
 		return -1;
-    }
-    else
-    {
-    	dbg_printf(DBG_LESS_INFO, "IMX219 Init by app (IMX219_dgain_setting)\n");
-    }
+	}
+	else
+	{
+		dbg_printf(DBG_LESS_INFO, "IMX219 Init by app (IMX219_dgain_setting)\n");
+	}
 
-    //imx219_set_mirror
-    if(hx_drv_cis_setRegTable(IMX219_mirror_setting, HX_CIS_SIZE_N(IMX219_mirror_setting, HX_CIS_SensorSetting_t))!= HX_CIS_NO_ERROR)
-    {
-        dbg_printf(DBG_LESS_INFO, "IMX219 Init by app fail (IMX219_mirror_setting)\n");
+	//imx219_set_mirror
+	if(hx_drv_cis_setRegTable(IMX219_mirror_setting, HX_CIS_SIZE_N(IMX219_mirror_setting, HX_CIS_SensorSetting_t))!= HX_CIS_NO_ERROR)
+	{
+		dbg_printf(DBG_LESS_INFO, "IMX219 Init by app fail (IMX219_mirror_setting)\n");
 		return -1;
-    }
-    else
-    {
-    	dbg_printf(DBG_LESS_INFO, "IMX219 Init by app (IMX219_mirror_setting)\n");
-    }
+	}
+	else
+	{
+		dbg_printf(DBG_LESS_INFO, "IMX219 Init by app (IMX219_mirror_setting)\n");
+	}
 
     return 0;
 }
@@ -381,13 +434,20 @@ int cisdp_dp_init(bool inp_init, SENSORDPLIB_PATH_E dp_type, evthandlerdp_CBEven
     HW5x5_CFG_T hw5x5_cfg;
     JPEG_CFG_T jpeg_cfg;
 
+    g_subs = subs;
     //HW2x2 Cfg
     hw2x2_cfg.hw2x2_path = DP_HW2X2_PATH;
     hw2x2_cfg.hw_22_process_mode = DP_HW2X2_PROCESS_MODE;
     hw2x2_cfg.hw_22_crop_stx = DP_HW2X2_CROP_START_X;
     hw2x2_cfg.hw_22_crop_sty = DP_HW2X2_CROP_START_Y;
-    hw2x2_cfg.hw_22_in_width = DP_HW2X2_CROP_WIDTH;
-    hw2x2_cfg.hw_22_in_height = DP_HW2X2_CROP_HEIGHT;
+    hw2x2_cfg.hw_22_in_width = (subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X)?
+    		640:(subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_2X)?
+    		320:(subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_4X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_4X)?
+    		160:640;//DP_HW2X2_CROP_WIDTH;
+    hw2x2_cfg.hw_22_in_height = (subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X)?
+    		480:(subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_2X)?
+    		240:(subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_4X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_4X)?
+			120:480;//DP_HW2X2_CROP_HEIGHT;
     hw2x2_cfg.hw_22_mono_round_mode = DP_HW2X2_ROUND_MODE;
 
     //CDM Cfg
@@ -414,18 +474,34 @@ int cisdp_dp_init(bool inp_init, SENSORDPLIB_PATH_E dp_type, evthandlerdp_CBEven
     //HW5x5 Cfg
     hw5x5_cfg.hw5x5_path = DP_HW5X5_PATH;
     hw5x5_cfg.demos_bndmode = DP_HW5X5_DEMOS_BNDMODE;
-    hw5x5_cfg.demos_color_mode = DP_HW5X5_DEMOS_COLORMODE;
+    hw5x5_cfg.demos_color_mode =
+    		(subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X||subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X||subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_4X)?
+    		DEMOS_COLORMODE_RGB:
+			(subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_2X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_4X)?
+    		DEMOS_COLORMODE_YUV420:DEMOS_COLORMODE_YUV420;//DP_HW5X5_DEMOS_COLORMODE;
     hw5x5_cfg.demos_pattern_mode = DP_HW5X5_DEMOS_PATTERN;
     hw5x5_cfg.demoslpf_roundmode = DP_HW5X5_DEMOSLPF_ROUNDMODE;
     hw5x5_cfg.hw55_crop_stx = DP_HW5X5_CROP_START_X;
     hw5x5_cfg.hw55_crop_sty = DP_HW5X5_CROP_START_X;
-    hw5x5_cfg.hw55_in_width = DP_HW5X5_CROP_WIDTH;
-    hw5x5_cfg.hw55_in_height = DP_HW5X5_CROP_HEIGHT;
+    hw5x5_cfg.hw55_in_width = (subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X)?
+    		640:(subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_2X)?
+    		320:(subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_4X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_4X)?
+    		160:640;//DP_HW5X5_CROP_WIDTH;
+    hw5x5_cfg.hw55_in_height = (subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X)?
+    		480:(subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_2X)?
+    		240:(subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_4X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_4X)?
+			120:480;//DP_HW5X5_CROP_HEIGHT;
 
     //JPEG Cfg
     jpeg_cfg.jpeg_path = DP_JPEG_PATH;
-    jpeg_cfg.enc_width = DP_JPEG_ENC_WIDTH;
-    jpeg_cfg.enc_height = DP_JPEG_ENC_HEIGHT;
+    jpeg_cfg.enc_width = (subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X)?
+    		640:(subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_2X)?
+    		320:(subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_4X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_4X)?
+    		160:640;//DP_JPEG_ENC_WIDTH;
+    jpeg_cfg.enc_height = (subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X)?
+    		480:(subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_2X)?
+    		240:(subs==APP_DP_RES_RGB640x480_INP_SUBSAMPLE_4X||subs==APP_DP_RES_YUV640x480_INP_SUBSAMPLE_4X)?
+			120:480;//DP_JPEG_ENC_HEIGHT;
     jpeg_cfg.jpeg_enctype = DP_JPEG_ENCTYPE;
     jpeg_cfg.jpeg_encqtable = DP_JPEG_ENCQTABLE;
 
@@ -448,7 +524,14 @@ int cisdp_dp_init(bool inp_init, SENSORDPLIB_PATH_E dp_type, evthandlerdp_CBEven
     else
     	crop.last_y = 0;
 
-	sensordplib_set_sensorctrl_inp_wi_crop_bin(SENCTRL_SENSOR_TYPE, SENCTRL_STREAM_TYPE, SENCTRL_SENSOR_WIDTH, SENCTRL_SENSOR_HEIGHT, DP_INP_SUBSAMPLE, crop, DP_INP_BINNING);
+	if (subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X||subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X)
+		sensordplib_set_sensorctrl_inp_wi_crop_bin(SENCTRL_SENSOR_TYPE, SENCTRL_STREAM_TYPE, SENCTRL_SENSOR_WIDTH, SENCTRL_SENSOR_HEIGHT, INP_SUBSAMPLE_DISABLE, crop, DP_INP_BINNING);
+	else if (subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X||subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_2X)
+		sensordplib_set_sensorctrl_inp_wi_crop_bin(SENCTRL_SENSOR_TYPE, SENCTRL_STREAM_TYPE, SENCTRL_SENSOR_WIDTH, SENCTRL_SENSOR_HEIGHT, INP_SUBSAMPLE_4TO2, crop, DP_INP_BINNING);
+	else if (subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_4X||subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_4X)
+			sensordplib_set_sensorctrl_inp_wi_crop_bin(SENCTRL_SENSOR_TYPE, SENCTRL_STREAM_TYPE, SENCTRL_SENSOR_WIDTH, SENCTRL_SENSOR_HEIGHT, INP_SUBSAMPLE_8TO2, crop, DP_INP_BINNING);
+	else
+		dbg_printf(DBG_LESS_INFO, "APP_DP_RES Not support case \r\n");
 
 	uint8_t cyclic_buffer_cnt = 1;
 
@@ -546,7 +629,7 @@ int cisdp_dp_init(bool inp_init, SENSORDPLIB_PATH_E dp_type, evthandlerdp_CBEven
 void cisdp_stream_on()
 {
     /*
-     * Default Stream On
+     * Stream On
      */
     if(hx_drv_cis_setRegTable(IMX219_stream_on, HX_CIS_SIZE_N(IMX219_stream_on, HX_CIS_SensorSetting_t))!= HX_CIS_NO_ERROR)
     {
@@ -563,7 +646,7 @@ void cisdp_stream_on()
 void cisdp_stream_off()
 {
     /*
-     * Default Stream Off
+     * Stream Off
      */
     if(hx_drv_cis_setRegTable(IMX219_stream_off, HX_CIS_SIZE_N(IMX219_stream_off, HX_CIS_SensorSetting_t))!= HX_CIS_NO_ERROR)
     {
@@ -667,24 +750,59 @@ uint32_t app_get_jpeg_addr()
 	return g_wdma2_baseaddr;
 }
 
+uint32_t app_get_jpeg_sz()
+{
+    //EPII_InvalidateDCache_by_Addr(g_jpegautofill_addr, 4);
+    hx_InvalidateDCache_by_Addr((volatile void *)g_jpegautofill_addr, 32);
+	return *((uint32_t*)g_jpegautofill_addr);
+}
+
 uint32_t app_get_raw_addr()
 {
-	return g_wdma3_baseaddr;
+	//raw data area BBBBBB/GGGGGG/RRRRRR
+	return g_wdma3_baseaddr;	//return B for use
 }
 
 uint32_t app_get_raw_sz()
 {
-	return (IMX219_HW5x5_CROP_WIDTH*IMX219_HW5x5_CROP_HEIGHT*3/2);  //YUV420
+	if(g_subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X)
+		return 460800;//640*480*1.5;
+	else if(g_subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_2X)
+		return 115200;//320*240*1.5;
+	else if(g_subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_4X)
+		return 28800;//160*120*1.5;
+	else if(g_subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X)
+		return 921600;//640*480*3;
+	else if(g_subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X)
+		return 230400;//320*240*3;
+	else if(g_subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_4X)
+		return 57600;//160*120*3;
+	else
+		return 640*480*3;
 }
 
 uint32_t app_get_raw_width()
 {
-	return IMX219_HW5x5_CROP_WIDTH;
+	if(g_subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X||g_subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X)
+		return 640;
+	else if(g_subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X||g_subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_2X)
+		return 320;
+	else if(g_subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_4X||g_subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_4X)
+		return 160;
+	else
+		return 640;
 }
 
 uint32_t app_get_raw_height()
 {
-	return IMX219_HW5x5_CROP_HEIGHT;
+	if(g_subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X||g_subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_1X)
+		return 480;
+	else if(g_subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X||g_subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_2X)
+		return 240;
+	else if(g_subs == APP_DP_RES_RGB640x480_INP_SUBSAMPLE_4X||g_subs == APP_DP_RES_YUV640x480_INP_SUBSAMPLE_4X)
+		return 120;
+	else
+		return 480;
 }
 
 uint32_t app_get_raw_channels() {

@@ -12,6 +12,7 @@ extern "C" {
 #include "img_proc_helium.h"
 #include "WE2_core.h"
 #include "WE2_device.h"
+#include "spi_eeprom_comm.h"
 #ifdef IP_xdma
 #include "hx_drv_xdma.h"
 #include "sensor_dp_lib.h"
@@ -292,6 +293,8 @@ extern "C" int ei_standalone_inferencing_app(void)
 
 	hx_drv_pmu_get_ctrl(PMU_pmu_wakeup_EVT, &wakeup_event);
 	hx_drv_pmu_get_ctrl(PMU_pmu_wakeup_EVT1, &wakeup_event1);
+	hx_lib_spi_eeprom_open(USE_DW_SPI_MST_Q);
+	hx_lib_spi_eeprom_enable_XIP(USE_DW_SPI_MST_Q, true, FLASH_QUAD, true);
 
 	if(_arm_npu_init(true, true) !=0 ) {
 		ei_printf("Faield to init NPU\n");
@@ -304,7 +307,7 @@ extern "C" int ei_standalone_inferencing_app(void)
 
     dp_var_int();
 
-    if(cisdp_dp_init(true, SENSORDPLIB_PATH_INT_INP_HW5X5_JPEG, event_handler_cb, g_img_data, APP_DP_RES_RGB640x480_INP_SUBSAMPLE_1X) < 0)
+    if(cisdp_dp_init(true, SENSORDPLIB_PATH_INT_INP_HW5X5_JPEG, event_handler_cb, g_img_data, APP_DP_RES_RGB640x480_INP_SUBSAMPLE_2X) < 0)
     {
         ei_printf("\r\nDATAPATH Init fail\r\n");
     }

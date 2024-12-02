@@ -1,7 +1,7 @@
 /*
  * cisdp_cfg.h
  *
- *  Created on: 2022�~11��24��
+ *  Created on: 20240122
  *      Author: 901912
  *
  *      HW5X5
@@ -62,7 +62,8 @@ typedef enum
 //#define CIS_ENABLE_HX_AUTOI2C			(0x00) //0x00: off/0x01: on/0x2: on and XSLEEP KEEP HIGH
 //#define CIS_ENABLE_XSLEEP_TRIG_FRM		(0x01)
 
-#define CIS_MIRROR_SETTING				(0x01) //0x00: off/0x01:H-Mirror/0x02:V-Mirror/0x03:HV-Mirror
+#define CIS_MIRROR_SETTING				(0x03) //0x00: off/0x01:H-Mirror/0x02:V-Mirror/0x03:HV-Mirror //old 
+// #define CIS_MIRROR_SETTING				(0x01) //0x00: off/0x01:H-Mirror/0x02:V-Mirror/0x03:HV-Mirror //new
 #define CIS_I2C_ID						(0x24)
 #define CIS_ENABLE_MIPI_INF				(0x00) //0x00: off/0x01: on
 #define CIS_ENABLE_HX_AUTOI2C			(0x00) //0x00: off/0x01: on/0x2: on and XSLEEP KEEP HIGH
@@ -482,7 +483,8 @@ typedef enum
  */
 #define DP_HW5X5_PATH				HW5x5_PATH_THROUGH_DEMOSAIC
 #define DP_HW5X5_DEMOS_BNDMODE		DEMOS_BNDODE_REFLECT
-#define DP_HW5X5_DEMOS_COLORMODE	DEMOS_COLORMODE_YUV420
+//#define DP_HW5X5_DEMOS_COLORMODE	DEMOS_COLORMODE_YUV422
+#define DP_HW5X5_DEMOS_COLORMODE	DEMOS_COLORMODE_RGB
 
 #if (CIS_MIRROR_SETTING == 0x01)
 #define DP_HW5X5_DEMOS_PATTERN		DEMOS_PATTENMODE_GBRG
@@ -535,7 +537,7 @@ typedef enum
 #define DP_JPEG_PATH				JPEG_PATH_ENCODER_EN
 #define DP_JPEG_ENC_WIDTH 			DP_HW5X5_OUT_WIDTH
 #define DP_JPEG_ENC_HEIGHT 			DP_HW5X5_OUT_HEIGHT
-#define DP_JPEG_ENCTYPE 			JPEG_ENC_TYPE_YUV420
+#define DP_JPEG_ENCTYPE 			JPEG_ENC_TYPE_YUV420//JPEG_ENC_TYPE_YUV422
 #define DP_JPEG_ENCQTABLE 			JPEG_ENC_QTABLE_10X
 
 #endif

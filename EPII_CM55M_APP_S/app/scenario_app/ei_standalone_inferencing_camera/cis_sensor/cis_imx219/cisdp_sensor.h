@@ -34,8 +34,8 @@ typedef enum CISDP_INIT_TYPE_S
 	CISDP_INIT_TYPE_AOS				= 0x02,			/*For PMU USAGE*/
 } CISDP_INIT_TYPE_E;
 
-int  cisdp_sensor_init();
-int  cisdp_dp_init(bool inp_init, SENSORDPLIB_PATH_E dp_type, evthandlerdp_CBEvent_t cb_event, uint32_t jpg_ratio, APP_DP_INP_SUBSAMPLE_E subs);
+int cisdp_sensor_init();
+int cisdp_dp_init(bool inp_init, SENSORDPLIB_PATH_E dp_type, evthandlerdp_CBEvent_t cb_event, uint32_t jpg_ratio, APP_DP_INP_SUBSAMPLE_E subs);
 void cisdp_sensor_start();
 void cisdp_sensor_stop();
 void cisdp_stream_on();
@@ -45,6 +45,7 @@ void set_mipi_csirx_enable();
 void cisdp_get_jpginfo(uint32_t *jpeg_enc_filesize, uint32_t *jpeg_enc_addr);
 
 uint32_t app_get_jpeg_addr();
+uint32_t app_get_jpeg_sz();
 uint32_t app_get_raw_addr();
 uint32_t app_get_raw_sz();
 uint32_t app_get_raw_width();
