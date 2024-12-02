@@ -17,7 +17,7 @@ To deploy your model converted to Ethos-U55-64 format in your project, go to the
 
 ![Ethos-U55-64 deployment in the Edge Impulse Studio](../../../../images/ei-ethos-deployment-1.png)
 
-After selecting the deployment target, make sure the `TensorFlow Lite` version is selected (`step 3`) na d`Quantized (int8)` optimization is selected (`step 4`) - Ethos NPU doesn't support unoptimized (float32) models. Then click `Build` (`step 5`)
+After selecting the deployment target, make sure the `TensorFlow Lite` version is selected (`step 3`) and `Quantized (int8)` optimization is selected (`step 4`) - Ethos NPU doesn't support unoptimized (float32) models. Then click `Build` (`step 5`)
 
 ![Ethos-U55-64 deployment in the Edge Impulse Studio](../../../../images/ei-ethos-deployment-2.png)
 
@@ -58,9 +58,9 @@ The most straightforward approach is to use the [himax-flash-tool](https://docs.
 1. Install the flash tool following the instructions in the [Edge Impulse docs](https://docs.edgeimpulse.com/docs/tools/edge-impulse-cli/cli-installation)
 2. Open your terminal window in the root directory of this repository
 3. Run the following command
- ```bash
+   ```bash
    himax-flash-tool -d WiseEye2 -f output_case1_sec_wlcsp/output.img
- ```
+   ```
 
 If you don't want to install the Edge Impulse CLI tools, follow the [official guide on flashing the board](../../../../README.md#how-to-flash-the-firmware)
 
