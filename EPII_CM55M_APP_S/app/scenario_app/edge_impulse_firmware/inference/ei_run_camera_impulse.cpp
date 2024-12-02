@@ -84,7 +84,7 @@ void ei_run_impulse(void)
         return;
     }
 
-    display_results(&result);
+    display_results(&ei_default_impulse, &result);
 
     if (debug_mode)
     {
