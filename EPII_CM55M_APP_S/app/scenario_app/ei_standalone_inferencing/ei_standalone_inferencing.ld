@@ -5,10 +5,13 @@ MEMORY
   CM55M_S_APP_ROM (rx) : ORIGIN = 0x10000000, LENGTH = 0x40000 /* 256K bytes  */
   CM55M_S_APP_DATA (rwx) : ORIGIN = 0x30000000, LENGTH = 0x40000 /* 256K bytes*/
   CM55M_S_SRAM (rwx) : ORIGIN = BOOT2NDLOADER_BASE, LENGTH = 0x00200000-(BOOT2NDLOADER_BASE-BASE_ADDR_SRAM0_ALIAS) /* 2M-0x1f000 bytes*/
+  CM55M_S_FLASH_XIP (rx) : ORIGIN = BASE_ADDR_FLASH1_R_ALIAS+0x200000, LENGTH = 0x00e00000 /* Flash base addr + 2MB (firmware slots A & B), size 14MB */
 }
 
-__HEAP_SIZE = 0x60000;
-__STACK_SIZE = 0x10000;
+/* Heap size: 1536 KB */
+__HEAP_SIZE = 0x180000;
+/* Stack size: 28 KB */
+__STACK_SIZE = 0x7000;
 
 ENTRY(Reset_Handler)
 
@@ -34,11 +37,10 @@ SECTIONS
         __unprivileged_flash_start__ = .;
     } > CM55M_S_APP_ROM
 
-    .text_2 : ALIGN(4)
+    .text_1 : ALIGN(4)
     {
-        *libdriver.*:*(.text* .rodata*)
-        *cvapp.o (.text* .rodata*)
-    } > CM55M_S_SRAM
+        *lib*.*:*(.text* .rodata*)
+    } > CM55M_S_APP_ROM
 
     .text : ALIGN(4)
     {
@@ -66,11 +68,6 @@ SECTIONS
         KEEP(*(.eh_frame*))
     } > CM55M_S_SRAM
 
-    .model : ALIGN(4)
-    {
-        *ei_standalone_inferencing.o*(.text* .rodata* .data*)
-    } > CM55M_S_SRAM
-
     .noinit (NOLOAD): ALIGN(4)
     {
         *(.bss.NoInit*)
@@ -82,8 +79,7 @@ SECTIONS
         __rodata_start = .;
         *(.rodata .rodata.* .constdata .constdata.*)
         __rodata_end = .;
-    } > CM55M_S_SRAM
-
+    } > CM55M_S_APP_DATA
 
     /*
      * for exception handling/unwind - some Newlib functions (in common
@@ -172,7 +168,6 @@ SECTIONS
         __data_end__ = .;
     } > CM55M_S_APP_DATA
 
-
     .bss :
     {
         . = ALIGN(4);
@@ -197,6 +192,12 @@ SECTIONS
         PROVIDE(__end_noinit_SRAM = .) ;
     } > CM55M_S_APP_DATA
 
+    /* NOLOAD because we don't want model in the firmware image, model is being flashed separately */
+    .model (NOLOAD): ALIGN(4)
+    {
+    	* (.tflite_model)
+    } > CM55M_S_FLASH_XIP
+
     /* Reserve and place Heap within memory map */
     .heap (COPY) :
     {
@@ -210,8 +211,8 @@ SECTIONS
         PROVIDE(__HeapLimit = .);
     } > CM55M_S_SRAM
 
-    /* Locate actual Stack in memory map */
-    .stack (ORIGIN(CM55M_S_APP_DATA) + LENGTH(CM55M_S_APP_DATA) - __STACK_SIZE) (COPY) :
+    /* Locate actual Stack at the end of SRAM */
+    .stack (ORIGIN(CM55M_S_SRAM) + LENGTH(CM55M_S_SRAM) - __STACK_SIZE) (COPY) :
     {
         . = ALIGN(8);
         __StackLimit = .;
@@ -220,13 +221,13 @@ SECTIONS
         . = ALIGN(8);
         __StackTop = .;
         PROVIDE(__StackTop = .);
-    } > CM55M_S_APP_DATA
+    } > CM55M_S_SRAM
 
     PROVIDE(__stack = __StackTop);
 
     /* Check if data + heap + stack exceeds RAM limit */
     /* Heap has been moved to SRAM (from DTCM) so we are not checking the overlap */
-    /* ASSERT(__StackLimit >= __HeapLimit, "region RAM overflowed with stack") */
+    ASSERT(__StackLimit >= __HeapLimit, "region RAM overflowed with stack")
 
     /* Provide basic symbols giving location and size of main text
      * block, including initial values of RW data sections. Note that

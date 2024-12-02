@@ -7,21 +7,24 @@ APPL_DEFINES += -DEI_ETHOS
 APPL_DEFINES += -DETHOSU_ARCH=u55
 APPL_DEFINES += -DETHOSU55
 APPL_DEFINES += -DETHOS_U
+APPL_DEFINES += -DEI_MODEL_SECTION=".model"
 
 ##
 # library support feature
 # Add new library here
 # The source code should be loacted in ~\library\{lib_name}\
 ##
-LIB_SEL =
+LIB_SEL = spi_eeprom
 
 ##
 # middleware support feature
 # Add new middleware here
 # The source code should be loacted in ~\middleware\{mid_name}\
 ##
-MID_SEL = 
+MID_SEL =
 
+# disable built-in CMSIS NN library. Edge Impulse SDK is providing its own NN library
+override LIB_CMSIS_NN_ENALBE := 0
 override undefine OS_SEL
 override TRUSTZONE := y
 override TRUSTZONE_TYPE := security
@@ -66,6 +69,7 @@ SCENARIO_APP_SUPPORT_LIST +=	ei_standalone_inferencing/ei-model/tflite-model \
 								ei_standalone_inferencing/ei-model/edge-impulse-sdk/porting/himax-we2 \
 								ei_standalone_inferencing/ei-model/edge-impulse-sdk/porting/ethos-core-driver/include \
 								ei_standalone_inferencing/ei-model/edge-impulse-sdk/porting/ethos-core-driver/src \
+								ei_standalone_inferencing/ei-model/edge-impulse-sdk/dsp \
 								ei_standalone_inferencing/ei-model/edge-impulse-sdk/dsp/kissfft \
 								ei_standalone_inferencing/ei-model/edge-impulse-sdk/dsp/dct \
 								ei_standalone_inferencing/ei-model/edge-impulse-sdk/dsp/image \

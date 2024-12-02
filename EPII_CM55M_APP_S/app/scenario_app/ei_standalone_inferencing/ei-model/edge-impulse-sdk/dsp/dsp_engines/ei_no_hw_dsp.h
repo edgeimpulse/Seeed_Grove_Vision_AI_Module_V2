@@ -28,32 +28,33 @@
  * either express or implied. See the License for the specific language governing
  * permissions, disclaimers and limitations under the License.
  */
-// Generated on: 29.07.2024 09:47:13
+#ifndef __EI_NO_HW_DSP__H__
+#define __EI_NO_HW_DSP__H__
 
-#ifndef tflite_learn_5_GEN_H
-#define tflite_learn_5_GEN_H
+#include <cstddef>
+#include "edge-impulse-sdk/dsp/returntypes.hpp"
+#include "edge-impulse-sdk/dsp/numpy_types.h"
 
-#include "edge-impulse-sdk/tensorflow/lite/c/common.h"
+// Make these constexpr to let compiler optimize the if statements out
 
-// Sets up the model with init and prepare steps.
-TfLiteStatus tflite_learn_5_init( void*(*alloc_fnc)(size_t,size_t) );
-// Returns the input tensor with the given index.
-TfLiteStatus tflite_learn_5_input(int index, TfLiteTensor* tensor);
-// Returns the output tensor with the given index.
-TfLiteStatus tflite_learn_5_output(int index, TfLiteTensor* tensor);
-// Runs inference for the model.
-TfLiteStatus tflite_learn_5_invoke();
-//Frees memory allocated
-TfLiteStatus tflite_learn_5_reset( void (*free)(void* ptr) );
+namespace ei {
 
+namespace fft {
 
-// Returns the number of input tensors.
-inline size_t tflite_learn_5_inputs() {
-  return 1;
-}
-// Returns the number of output tensors.
-inline size_t tflite_learn_5_outputs() {
-  return 1;
+constexpr int hw_r2r_fft(float* input, float* output, size_t n_fft) {
+    return EIDSP_NO_HW_ACCEL;
 }
 
-#endif
+constexpr int hw_r2c_fft(const float *input, ei::fft_complex_t *output, size_t n_fft) {
+    return EIDSP_NO_HW_ACCEL;
+}
+
+// dummy values
+constexpr int MIN_FFT_SIZE = 0;
+constexpr int MAX_FFT_SIZE = 0;
+
+} // namespace fft
+
+} // namespace ei
+
+#endif  //!__EI_NO_HW_DSP__H__

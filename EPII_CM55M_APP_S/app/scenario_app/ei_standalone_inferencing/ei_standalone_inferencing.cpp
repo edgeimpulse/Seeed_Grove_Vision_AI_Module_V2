@@ -8,6 +8,7 @@ extern "C" {
 };
 #include "WE2_core.h"
 #include "ethosu_driver.h"
+#include "spi_eeprom_comm.h"
 
 #ifdef TRUSTZONE_SEC
 #define U55_BASE	BASE_ADDR_APB_U55_CTRL_ALIAS
@@ -88,6 +89,8 @@ extern "C" int ei_standalone_inferencing_app(void)
 
 	hx_drv_pmu_get_ctrl(PMU_pmu_wakeup_EVT, &wakeup_event);
 	hx_drv_pmu_get_ctrl(PMU_pmu_wakeup_EVT1, &wakeup_event1);
+	hx_lib_spi_eeprom_open(USE_DW_SPI_MST_Q);
+	hx_lib_spi_eeprom_enable_XIP(USE_DW_SPI_MST_Q, true, FLASH_QUAD, true);
 
 	if(_arm_npu_init(true, true) !=0 ) {
 		ei_printf("Faield to init NPU\n");
@@ -105,7 +108,61 @@ extern "C" int ei_standalone_inferencing_app(void)
 		// Perform DSP pre-processing and inference
 		res = run_classifier(&signal, &result, false);
 		if (res == EI_IMPULSE_OK) {
-			display_results(&result);
+            // print the predictions
+            ei_printf("Predictions (DSP: %d ms., Classification: %d ms., Anomaly: %d ms.): \n",
+                        result.timing.dsp, result.timing.classification, result.timing.anomaly);
+#if EI_CLASSIFIER_OBJECT_DETECTION == 1
+            ei_printf("#Object detection results:\r\n");
+            bool bb_found = result.bounding_boxes[0].value > 0;
+            for (size_t ix = 0; ix < result.bounding_boxes_count; ix++) {
+                auto bb = result.bounding_boxes[ix];
+                if (bb.value == 0) {
+                    continue;
+                }
+                ei_printf("    %s (", bb.label);
+                ei_printf_float(bb.value);
+                ei_printf(") [ x: %u, y: %u, width: %u, height: %u ]\n", bb.x, bb.y, bb.width, bb.height);
+            }
+
+            if (!bb_found) {
+                ei_printf("    No objects found\n");
+            }
+
+#elif (EI_CLASSIFIER_LABEL_COUNT == 1) && (!EI_CLASSIFIER_HAS_ANOMALY)// regression
+            ei_printf("#Regression results:\r\n");
+            ei_printf("    %s: ", result.classification[0].label);
+            ei_printf_float(result.classification[0].value);
+            ei_printf("\n");
+
+#elif EI_CLASSIFIER_LABEL_COUNT > 1 // if there is only one label, this is an anomaly only
+            ei_printf("#Classification results:\r\n");
+            for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
+                ei_printf("    %s: ", result.classification[ix].label);
+                ei_printf_float(result.classification[ix].value);
+                ei_printf("\n");
+            }
+#endif
+#if EI_CLASSIFIER_HAS_ANOMALY == 3 // visual AD
+            ei_printf("#Visual anomaly grid results:\r\n");
+            for (uint32_t i = 0; i < result.visual_ad_count; i++) {
+                ei_impulse_result_bounding_box_t bb = result.visual_ad_grid_cells[i];
+                if (bb.value == 0) {
+                    continue;
+                }
+                ei_printf("    %s (", bb.label);
+                ei_printf_float(bb.value);
+                ei_printf(") [ x: %u, y: %u, width: %u, height: %u ]\n", bb.x, bb.y, bb.width, bb.height);
+            }
+            ei_printf("Visual anomaly values: Mean ");
+            ei_printf_float(result.visual_ad_result.mean_value);
+            ei_printf(" Max ");
+            ei_printf_float(result.visual_ad_result.max_value);
+            ei_printf("\r\n");
+#elif (EI_CLASSIFIER_HAS_ANOMALY > 0) // except for visual AD
+            ei_printf("Anomaly prediction: ");
+            ei_printf_float(result.anomaly);
+            ei_printf("\r\n");
+#endif
 		}
 		else {
 			ei_printf("ERR: Failed to run impulse (%d)\n", res);

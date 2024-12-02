@@ -202,6 +202,14 @@ typedef struct {
 } ei_impulse_result_timing_t;
 
 /**
+ * @brief Holds intermediate results of hr / hrv block
+ *
+*/
+typedef struct {
+    float heart_rate;
+} ei_impulse_result_hr_t;
+
+/**
  * @brief Holds the output of inference, anomaly results, and timing information.
  *
  * `ei_impulse_result_t` holds the output of `run_classifier()`. If object detection is
@@ -287,6 +295,11 @@ typedef struct {
      */
     ei_impulse_visual_ad_result_t visual_ad_result;
 #endif // EI_CLASSIFIER_HAS_VISUAL_ANOMALY
+    ei_post_processing_output_t postprocessed_output;
+
+#if EI_CLASSIFIER_HR_ENABLED == 1
+    ei_impulse_result_hr_t hr_calcs;
+#endif
 } ei_impulse_result_t;
 
 /** @} */

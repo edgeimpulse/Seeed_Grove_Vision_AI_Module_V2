@@ -32,10 +32,17 @@
 #ifndef _EI_CLASSIFIER_MODEL_VARIABLES_H_
 #define _EI_CLASSIFIER_MODEL_VARIABLES_H_
 
+/**
+ * @file
+ *  Auto-generated complete impulse definitions. The ei_impulse_handle_t should
+ *  be passed to ei_run_classifier() function to use this specific impulse.
+ *  This file should only be included in ei_run_classifier.h file.
+ */
+
 #include <stdint.h>
 #include "model_metadata.h"
 
-#include "tflite-model/tflite_learn_5_compiled.h"
+#include "tflite-model/tflite_learn_5.h"
 #include "edge-impulse-sdk/classifier/ei_model_types.h"
 #include "edge-impulse-sdk/classifier/inferencing_engines/engines.h"
 
@@ -61,7 +68,7 @@ ei_dsp_config_mfcc_t ei_dsp_config_25 = {
     1 // int pre_shift
 };
 
-const size_t ei_dsp_blocks_size = 1;
+const uint8_t ei_dsp_blocks_size = 1;
 ei_model_dsp_t ei_dsp_blocks[ei_dsp_blocks_size] = {
     { // DSP block 25
         25,
@@ -74,13 +81,11 @@ ei_model_dsp_t ei_dsp_blocks[ei_dsp_blocks_size] = {
         nullptr, // factory function
     }
 };
-const ei_config_tflite_eon_graph_t ei_config_tflite_graph_5 = {
+const ei_config_tflite_graph_t ei_config_tflite_graph_5 = {
     .implementation_version = 1,
-    .model_init = &tflite_learn_5_init,
-    .model_invoke = &tflite_learn_5_invoke,
-    .model_reset = &tflite_learn_5_reset,
-    .model_input = &tflite_learn_5_input,
-    .model_output = &tflite_learn_5_output,
+    .model = tflite_learn_5,
+    .model_size = tflite_learn_5_len,
+    .arena_size = tflite_learn_5_arena_size
 };
 
 const ei_learning_block_config_tflite_graph_t ei_learning_block_config_5 = {
@@ -94,13 +99,13 @@ const ei_learning_block_config_tflite_graph_t ei_learning_block_config_5 = {
     .output_score_tensor = 2,
     .threshold = 0,
     .quantized = 1,
-    .compiled = 1,
+    .compiled = 0,
     .graph_config = (void*)&ei_config_tflite_graph_5
 };
 
-const size_t ei_learning_blocks_size = 1;
+const uint8_t ei_learning_blocks_size = 1;
 const uint32_t ei_learning_block_5_inputs[1] = { 25 };
-const uint32_t ei_learning_block_5_inputs_size = 1;
+const uint8_t ei_learning_block_5_inputs_size = 1;
 const ei_learning_block_t ei_learning_blocks[ei_learning_blocks_size] = {
     {
         5,
@@ -114,14 +119,7 @@ const ei_learning_block_t ei_learning_blocks[ei_learning_blocks_size] = {
     },
 };
 
-const ei_model_performance_calibration_t ei_calibration = {
-    1, /* integer version number */
-    false, /* has configured performance calibration */
-    (int32_t)(EI_CLASSIFIER_RAW_SAMPLE_COUNT / ((EI_CLASSIFIER_FREQUENCY > 0) ? EI_CLASSIFIER_FREQUENCY : 1)) * 1000, /* Model window */
-    0.8f, /* Default threshold */
-    (int32_t)(EI_CLASSIFIER_RAW_SAMPLE_COUNT / ((EI_CLASSIFIER_FREQUENCY > 0) ? EI_CLASSIFIER_FREQUENCY : 1)) * 500, /* Half of model window */
-    0   /* Don't use flags */
-};
+
 const ei_object_detection_nms_config_t ei_object_detection_nms = {
     0.0f, /* NMS confidence threshold */
     0.2f  /* NMS IOU threshold */
@@ -131,7 +129,9 @@ const ei_impulse_t impulse_14225_0 = {
     .project_id = 14225,
     .project_owner = "Edge Impulse Inc.",
     .project_name = "Tutorial: Responding to your voice",
-    .deploy_version = 91,
+    .impulse_id = 2,
+    .impulse_name = "Time series data, Audio (MFCC), Neural Network (Keras) #1",
+    .deploy_version = 101,
 
     .nn_input_frame_size = 624,
     .raw_sample_count = 15488,
@@ -147,10 +147,17 @@ const ei_impulse_t impulse_14225_0 = {
     
     .object_detection_count = 0,
     .fomo_output_size = 0,
+
+    
+    .visual_ad_grid_size_x = 0,
+    .visual_ad_grid_size_y = 0,
     
     .tflite_output_features_count = 3,
     .learning_blocks_size = ei_learning_blocks_size,
     .learning_blocks = ei_learning_blocks,
+
+    .postprocessing_blocks_size = 0,
+    .postprocessing_blocks = nullptr,
 
     .inferencing_engine = EI_CLASSIFIER_TFLITE,
 
@@ -161,7 +168,6 @@ const ei_impulse_t impulse_14225_0 = {
 
     .has_anomaly = EI_ANOMALY_TYPE_UNKNOWN,
     .label_count = 3,
-    .calibration = ei_calibration,
     .categories = ei_classifier_inferencing_categories,
     .object_detection_nms = ei_object_detection_nms
 };
@@ -169,4 +175,4 @@ const ei_impulse_t impulse_14225_0 = {
 ei_impulse_handle_t impulse_handle_14225_0 = ei_impulse_handle_t( &impulse_14225_0 );
 ei_impulse_handle_t& ei_default_impulse = impulse_handle_14225_0;
 
-#endif // _EI_CLASSIFIER_MODEL_METADATA_H_
+#endif // _EI_CLASSIFIER_MODEL_VARIABLES_H_
